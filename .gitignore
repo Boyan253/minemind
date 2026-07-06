@@ -1,0 +1,15 @@
+__pycache__/
+*.pyc
+.env
+
+# generated / personal runtime data
+pack/
+data/*
+!data/.gitkeep
+vendor/
+
+# mod build artifacts + local jars
+agentlink-mod/build/
+agentlink-mod/.gradle/
+agentlink-mod/libs/
+agentlink-mod/run/

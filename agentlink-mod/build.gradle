@@ -1,0 +1,31 @@
+plugins {
+    id 'net.minecraftforge.gradle' version '[6.0,6.2)'
+}
+
+group = 'dev.questpilot'
+version = "0.4.1"
+base { archivesName = 'agentlink' }
+
+java.toolchain.languageVersion = JavaLanguageVersion.of(17)
+
+minecraft {
+    mappings channel: 'official', version: '1.20.1'
+}
+
+dependencies {
+    minecraft 'net.minecraftforge:forge:1.20.1-47.4.0'
+    // production jars from the instance; we only touch their custom classes
+    // (public controller field, CommandExecutor, Character record), so no deobf needed
+    compileOnly files('libs/playerengine-forge-1.20.1-1.3.0.jar',
+                      'libs/player2npc-forge-1.20.1-1.3.0.jar')
+}
+
+jar {
+    manifest {
+        attributes 'Implementation-Title': 'agentlink',
+                   'Implementation-Version': project.version
+    }
+}
+
+// remap official -> SRG names so the jar runs in production
+jar.finalizedBy('reobfJar')

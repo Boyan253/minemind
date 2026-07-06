@@ -1,0 +1,40 @@
+modLoader = "javafml"
+loaderVersion = "[47,)"
+license = "MIT"
+
+[[mods]]
+modId = "agentlink"
+version = "0.4.1"
+displayName = "AgentLink"
+description = '''
+Exposes PlayerEngine agents to an external planner via /agent commands.
+Part of the Reclamation Agent project.
+'''
+
+[[dependencies.agentlink]]
+modId = "forge"
+mandatory = true
+versionRange = "[47,)"
+ordering = "NONE"
+side = "BOTH"
+
+[[dependencies.agentlink]]
+modId = "minecraft"
+mandatory = true
+versionRange = "[1.20.1,)"
+ordering = "NONE"
+side = "BOTH"
+
+[[dependencies.agentlink]]
+modId = "playerengine"
+mandatory = true
+versionRange = "[0,)"
+ordering = "AFTER"
+side = "BOTH"
+
+[[dependencies.agentlink]]
+modId = "player2npc"
+mandatory = true
+versionRange = "[0,)"
+ordering = "AFTER"
+side = "BOTH"
