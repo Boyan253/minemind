@@ -1,8 +1,8 @@
-# QuestPilot ⛏️🧠
+# MineMind ⛏️🧠
 
 **An autonomous AI player for _modded_ Minecraft.**
 
-QuestPilot reads your modpack's quest book, plans with an LLM, and sends a
+MineMind reads your modpack's quest book, plans with an LLM, and sends a
 server-side AI companion to do the work — mining, crafting (modded recipes
 included), fighting, hauling — while you keep playing. It is, as far as we
 know, the first open agent that plays **modpacks**, not just vanilla.
@@ -26,7 +26,7 @@ Every well-known Minecraft AI project is **vanilla-only**:
 
 Modded Minecraft — custom blocks, kubejs recipes, machine GUIs, 500-quest
 progression books — is where the actually interesting automation problems
-live. QuestPilot targets exactly that gap.
+live. MineMind targets exactly that gap.
 
 ## What it does today
 
@@ -90,7 +90,7 @@ build the mod), and one of: `GROQ_API_KEY` (free), `ANTHROPIC_API_KEY`, or a
 logged-in Claude Code CLI.
 
 ```bash
-git clone https://github.com/Boyan253/questpilot && cd questpilot
+git clone https://github.com/Boyan253/minemind && cd minemind
 
 # 1. mods into your instance's mods/ folder:
 #    - PlayerEngine + Player2NPC (CurseForge, Forge 1.20.1)
@@ -127,7 +127,7 @@ Early alpha, moving fast. Honest state of the world:
 
 ## Credits
 
-QuestPilot stands on excellent shoulders:
+MineMind stands on excellent shoulders:
 [PlayerEngine](https://github.com/Goodbird-git/PlayerEngine) by Goodbird ·
 [Automatone](https://github.com/Ladysnake/Automatone) by Ladysnake ·
 [AltoClef](https://github.com/gaucho-matrero/altoclef) ·
