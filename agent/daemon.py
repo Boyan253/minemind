@@ -326,7 +326,21 @@ def main():
         order = {c["filename"]: c["order_index"] for c in graph["chapters"]}
         frontier.sort(key=lambda q: (order.get(q["chapter"], 99), q["title"]))
         prompt = planner.build_planner_prompt(planner.chapter_summary(graph), frontier, game_state)
-        plan = planner.extract_json(llm.complete(planner.PLANNER_SYSTEM, prompt))
+        # planning can transiently fail (LLM rate limit, malformed JSON) — retry,
+        # then skip this cycle rather than crashing the whole session
+        plan = None
+        for attempt in range(3):
+            try:
+                plan = planner.extract_json(llm.complete(planner.PLANNER_SYSTEM, prompt))
+                break
+            except Exception as exc:
+                log(f"planning attempt {attempt + 1} failed: {exc}")
+                time.sleep(10)
+        if plan is None:
+            log("planning failed 3x — waiting 60s before next cycle")
+            bridge.call("echo", text="[agent] planner unavailable, will retry")
+            time.sleep(60)
+            continue
         targets = ", ".join(t["title"] for t in plan.get("target_quests", [])[:5])
         log(f"plan: {len(plan.get('steps', []))} steps targeting: {targets}")
         done, failed = run_plan(bridge, world, plan, actions, mark_complete)

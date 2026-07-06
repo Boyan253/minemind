@@ -84,7 +84,8 @@ def _claude_cli(system, prompt):
     result = subprocess.run(cmd, input=full_prompt, capture_output=True,
                             text=True, encoding="utf-8", timeout=600)
     if result.returncode != 0:
-        raise RuntimeError(f"claude CLI failed ({result.returncode}): {result.stderr[:300]}")
+        detail = (result.stderr or "").strip() or (result.stdout or "").strip() or "(no output)"
+        raise RuntimeError(f"claude CLI failed ({result.returncode}): {detail[:400]}")
     return result.stdout
 
 
