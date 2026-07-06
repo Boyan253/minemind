@@ -287,10 +287,36 @@ def main():
     import llm
     import planner
     graph = state_mod.load_graph(ROOT / "data" / "quest_graph.json")
+    quest_index = state_mod.quest_index(graph)
+
+    def reconcile_item_quests():
+        """FTB item-task auto-detection only fires on inventory CHANGE — items
+        delivered before a quest's dependencies complete never trigger it.
+        Force-complete any unlocked quest whose (non-consume) item tasks are
+        all satisfied by the player's current inventory."""
+        done = get_completed()
+        inv = {k.split(":")[-1]: v for k, v in
+               ((bridge.call("state") or {}).get("inventory") or {}).items()}
+        chapter_ids = {c["id"] for c in graph["chapters"]}
+        for quest in quest_index.values():
+            if quest["id"] in done or quest["optional"]:
+                continue
+            deps = [d for d in quest["dependencies"] if d not in chapter_ids]
+            if not all(d in done for d in deps):
+                continue
+            tasks = quest["tasks"]
+            if not tasks or not all(t.get("type") == "item" and t.get("item")
+                                    and not t.get("consume_items") for t in tasks):
+                continue
+            if all(inv.get(str(t["item"]).split(":")[-1], 0) >= int(t.get("count", 1))
+                   for t in tasks):
+                log(f"reconcile: completing '{quest['title']}' (items already in inventory)")
+                actions.quest_checkmark({"quest_id": quest["id"]})
     fail_counts = {}
     blocked = set()
     for cycle in range(args.max_cycles):
-        completed = get_completed()
+        reconcile_item_quests()
+        completed = get_completed() & set(quest_index)  # drop task ids from the count
         game_state = build_game_state(bridge, world, completed)
         frontier = [q for q in state_mod.frontier(graph, game_state) if q["id"] not in blocked]
         if not frontier:
