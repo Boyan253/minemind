@@ -51,6 +51,9 @@ live. MineMind targets exactly that gap.
 - **Verifies everything.** Inventory deltas, quest-save reads, chat-response
   checks. Failed steps trigger replanning; repeatedly failing quests get set
   aside instead of looping.
+- **Steer it from chat.** Type `.goal get me copper tools` in-game and the planner
+  obeys; `.goal clear` returns it to autonomous questing. Progress updates and
+  an end-of-session summary land in chat; every completed quest takes a screenshot.
 - **Escalates gracefully.** What it can't do yet (machine GUIs, claiming
   quest rewards), it asks for in chat and waits for your `.done`.
 

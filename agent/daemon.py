@@ -314,7 +314,28 @@ def main():
                 actions.quest_checkmark({"quest_id": quest["id"]})
     fail_counts = {}
     blocked = set()
+    directive = {"text": None, "chat_seen": 0}
+    session_start_done = len(get_completed() & set(quest_index))
+
+    def read_player_directive():
+        """Player steers from in-game chat: '.goal <text>' / '.goal clear'."""
+        logs = bridge.call("chat_log", since=directive["chat_seen"]) or {}
+        directive["chat_seen"] = logs.get("latest", directive["chat_seen"])
+        for entry in logs.get("entries", []):
+            msg = entry["message"]
+            if "[agent" in msg or ".goal" not in msg.lower():
+                continue
+            text = msg.lower().split(".goal", 1)[1].strip()
+            if text == "clear":
+                directive["text"] = None
+                bridge.call("echo", text="[agent] directive cleared — back to autonomous questing")
+            elif text:
+                directive["text"] = text
+                bridge.call("echo", text=f"[agent] directive accepted: {text}")
+                log(f"player directive: {text}")
+
     for cycle in range(args.max_cycles):
+        read_player_directive()
         reconcile_item_quests()
         completed = get_completed() & set(quest_index)  # drop task ids from the count
         game_state = build_game_state(bridge, world, completed)
@@ -323,9 +344,13 @@ def main():
             log("frontier empty — all reachable quests complete (or blocked)!")
             break
         log(f"cycle {cycle + 1}: {len(completed)} done, {len(frontier)} on frontier; planning via {llm.provider()}")
+        bridge.call("echo", text=f"[agent] quest progress: {len(completed)}/{len(quest_index)} — planning next moves...")
         order = {c["filename"]: c["order_index"] for c in graph["chapters"]}
         frontier.sort(key=lambda q: (order.get(q["chapter"], 99), q["title"]))
         prompt = planner.build_planner_prompt(planner.chapter_summary(graph), frontier, game_state)
+        if directive["text"]:
+            prompt += (f"\n\nPLAYER DIRECTIVE (highest priority — bias target and step "
+                       f"selection toward this): {directive['text']}")
         # planning can transiently fail (LLM rate limit, malformed JSON) — retry,
         # then skip this cycle rather than crashing the whole session
         plan = None
@@ -343,6 +368,7 @@ def main():
             continue
         targets = ", ".join(t["title"] for t in plan.get("target_quests", [])[:5])
         log(f"plan: {len(plan.get('steps', []))} steps targeting: {targets}")
+        bridge.call("echo", text=f"[agent] working on: {targets[:120]}")
         done, failed = run_plan(bridge, world, plan, actions, mark_complete)
         if failed:
             qid = failed.get("for_quest")
@@ -353,7 +379,12 @@ def main():
                 bridge.call("echo", text=f"[agent] giving up on quest {qid} for now — "
                                          f"may need your help with it later")
             log(f"replanning after failure at step {failed.get('n')}")
-    bridge.call("echo", text="[agent] session over")
+    final_done = len(get_completed() & set(quest_index))
+    gained = final_done - session_start_done
+    summary = (f"[agent] session over — {final_done}/{len(quest_index)} quests total, "
+               f"+{gained} this session")
+    log(summary)
+    bridge.call("echo", text=summary)
 
 
 if __name__ == "__main__":

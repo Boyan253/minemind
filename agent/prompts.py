@@ -59,6 +59,9 @@ Rules:
   chests. STRONGLY prefer using existing machines and stored materials over
   gathering or building from scratch. The player's tools (axes, pickaxes, ...)
   are shared — plan to use the best available tool rather than crafting new.
+- Mob-drop items (string, bones, rotten flesh...): the companion can KILL mobs
+  but does NOT auto-collect their drops yet. Avoid planning quests that need
+  mob drops unless the player directive asks for them; use "manual" instead.
 - Ocean/large water crossings: prefer land routes; if a crossing is essential,
   plan {"action":"craft","item":"minecraft:oak_boat",...} (or any wood variant
   in storage) followed by a "manual" step to drive it — boat piloting is not

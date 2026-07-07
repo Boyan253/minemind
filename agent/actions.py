@@ -111,6 +111,7 @@ class Actions:
                 return True, "completed manually (no OP on server)"
             return False, f"/ftbquests rejected: {chat[:150]}"
         self.mark_complete(qid)
+        self.bridge.call("screenshot")  # capture the moment for the session gallery
         return True, "command accepted (recorded; save file confirms on next autosave)"
 
     def goto(self, step):

@@ -211,12 +211,20 @@ def op_container_click(req):
     return fn(int(req["slot"])) if fn else None
 
 
+def op_screenshot(_req):
+    fn = _fn("screenshot")
+    if not fn:
+        return None
+    fn()
+    return True
+
+
 OPS = {"probe": op_probe, "state": op_state, "chat": op_chat, "echo": op_echo,
        "chat_log": op_chat_log, "getblock": op_getblock, "container": op_container,
        "look_at": op_look_at, "press": op_press, "inventory_slots": op_inventory_slots,
        "select_slot": op_select_slot, "slot_to_hotbar": op_slot_to_hotbar,
        "hand": op_hand, "entities": op_entities, "targeted_block": op_targeted_block,
-       "container_click": op_container_click}
+       "container_click": op_container_click, "screenshot": op_screenshot}
 
 
 def chat_listener():
