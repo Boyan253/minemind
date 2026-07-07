@@ -23,6 +23,10 @@ COMPANION actions (STRONGLY PREFERRED for resource work):
 - {"action": "agent_give", "item": "dead_log", "count": 16}           # transfer agent -> player. CRITICAL: quest item tasks check the PLAYER's inventory, so always agent_give after gathering/crafting!
 - {"action": "agent_run", "cmd": "follow"}                            # raw commands: follow | goto <x> <y> <z> | attack <mob> | deposit | equip <item> | stop
 Typical quest flow: agent_mine ingredients -> agent_craft item -> agent_give to player.
+NEVER use the player-body actions goto/goto_block/mine for resource work — the
+companion versions (agent_mine, agent_run goto) do the same job while the
+player stays free. Player-body movement is a last resort for things only the
+player can do (opening machine GUIs, clicking the quest book).
 
 You emit plans as JSON only, using EXACTLY this action vocabulary (the actuator
 implements these and nothing else):
