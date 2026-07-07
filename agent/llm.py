@@ -19,31 +19,61 @@ import urllib.request
 
 GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
 GROQ_DEFAULT_MODEL = os.environ.get("GROQ_MODEL", "llama-3.3-70b-versatile")
+GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions"
+GEMINI_DEFAULT_MODEL = os.environ.get("GEMINI_MODEL", "gemini-3-flash")
 ANTHROPIC_DEFAULT_MODEL = os.environ.get("RECLAMATION_PLANNER_MODEL", "claude-opus-4-8")
 
 
+KNOWN = ("gemini", "groq", "anthropic", "claude-cli")
+
+
 def provider():
-    p = os.environ.get("RECLAMATION_LLM", "").lower()
-    if p in ("groq", "anthropic", "claude-cli"):
+    """Single provider name, or a comma-separated failover chain
+    (e.g. RECLAMATION_LLM='gemini,groq,claude-cli')."""
+    p = os.environ.get("RECLAMATION_LLM", "").lower().replace(" ", "")
+    if p:
         return p
+    chain = []
+    if os.environ.get("GEMINI_API_KEY"):
+        chain.append("gemini")
     if os.environ.get("GROQ_API_KEY"):
-        return "groq"
+        chain.append("groq")
     if os.environ.get("ANTHROPIC_API_KEY"):
-        return "anthropic"
+        chain.append("anthropic")
     if shutil.which("claude"):
-        return "claude-cli"
-    raise RuntimeError("no LLM configured — set GROQ_API_KEY (free: console.groq.com), "
-                       "ANTHROPIC_API_KEY, or install/login the Claude Code CLI")
+        chain.append("claude-cli")
+    if not chain:
+        raise RuntimeError("no LLM configured — set GEMINI_API_KEY (free: aistudio.google.com), "
+                           "GROQ_API_KEY (free: console.groq.com), ANTHROPIC_API_KEY, "
+                           "or install/login the Claude Code CLI")
+    return ",".join(chain)
+
+
+def _dispatch(p, system, prompt, max_tokens):
+    if p == "groq":
+        return _groq(system, prompt, max_tokens)
+    if p == "gemini":
+        return _gemini(system, prompt, max_tokens)
+    if p == "claude-cli":
+        return _claude_cli(system, prompt)
+    if p == "anthropic":
+        return _anthropic(system, prompt, max_tokens)
+    raise RuntimeError(f"unknown LLM provider: {p!r} (known: {KNOWN})")
 
 
 def complete(system, prompt, max_tokens=4000):
-    """Return the model's text response for a system+user prompt pair."""
-    p = provider()
-    if p == "groq":
-        return _groq(system, prompt, max_tokens)
-    if p == "claude-cli":
-        return _claude_cli(system, prompt)
-    return _anthropic(system, prompt, max_tokens)
+    """Text response for a system+user pair; falls through the provider chain
+    on any failure (rate limit, network, auth) so free tiers stack."""
+    chain = [x for x in provider().split(",") if x]
+    last_error = None
+    for p in chain:
+        try:
+            return _dispatch(p, system, prompt, max_tokens)
+        except Exception as exc:
+            last_error = exc
+            if len(chain) > 1:
+                print(f"[llm] {p} failed ({str(exc)[:120]}) — trying next provider")
+    raise last_error
 
 
 def _groq(system, prompt, max_tokens):
@@ -62,6 +92,31 @@ def _groq(system, prompt, max_tokens):
             "Authorization": f"Bearer {os.environ['GROQ_API_KEY']}",
             "Content-Type": "application/json",
             # bare urllib UA gets Cloudflare-blocked (error 1010)
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/125.0",
+        },
+    )
+    with urllib.request.urlopen(req, timeout=120) as resp:
+        data = json.load(resp)
+    return data["choices"][0]["message"]["content"]
+
+
+def _gemini(system, prompt, max_tokens):
+    """Google AI Studio free tier (~1500 req/day for Flash) via the
+    OpenAI-compatible endpoint. Key: aistudio.google.com -> Get API key."""
+    body = json.dumps({
+        "model": GEMINI_DEFAULT_MODEL,
+        "max_tokens": max_tokens,
+        "response_format": {"type": "json_object"},
+        "messages": [
+            {"role": "system", "content": system},
+            {"role": "user", "content": prompt},
+        ],
+    }).encode()
+    req = urllib.request.Request(
+        GEMINI_URL, data=body,
+        headers={
+            "Authorization": f"Bearer {os.environ['GEMINI_API_KEY']}",
+            "Content-Type": "application/json",
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/125.0",
         },
     )
