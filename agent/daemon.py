@@ -277,6 +277,9 @@ def main():
         log("no companion in this world — spawning Bob")
         bridge.call("chat", text="/agent spawn Bob")
         time.sleep(3)
+    # silence PlayerEngine's Player2 cloud bridge (no account -> HTTP 500 spam);
+    # our planner drives the controller directly, so nothing is lost
+    bridge.call("chat", text="/agent run chatclef off")
 
     if args.plan:
         plan = json.loads(Path(args.plan).read_text(encoding="utf-8"))
