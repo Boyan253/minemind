@@ -34,7 +34,10 @@ live. MineMind targets exactly that gap.
   (chapters, quests, item tasks, rewards). The planner always knows the exact
   frontier of available quests — no screen reading, no guessing.
 - **Plans with any LLM.** Claude (API or your Claude Code login), Groq's free
-  tier, or anything you wire into one small provider file.
+  tier, or anything you wire into one small provider file. Sonnet-class models
+  are the sweet spot: the prompt carries the world facts and action vocabulary,
+  so the model plans rather than reasons from scratch
+  (`RECLAMATION_CLAUDE_MODEL=claude-sonnet-4-6`).
 - **Acts through a real body.** A [PlayerEngine](https://www.curseforge.com/minecraft/mc-mods/playerengine)
   companion entity — server-side, pathfinding by Automatone (Baritone fork),
   AltoClef task chains — plus our `agentlink` micro-mod that exposes it to the
