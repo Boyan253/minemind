@@ -416,9 +416,18 @@ class Actions:
             return False, "player never confirmed manual step"
         return True, "human handled it"
 
+    # resource work belongs to the companion — models (esp. free ones) keep
+    # planning player-body actions despite prompt rules, so route structurally
+    PLAYER_BODY_REMAP = {"mine": "agent_mine", "goto_block": "agent_mine"}
+
     def run(self, step):
         action = dict(step["action"])
         name = action.pop("action")
+        if name in self.PLAYER_BODY_REMAP and action.get("block"):
+            remapped = self.PLAYER_BODY_REMAP[name]
+            action.setdefault("count", 2 if name == "goto_block" else 8)
+            self.log(f"  (remapped {name} -> {remapped}: the companion handles resource work)")
+            name = remapped
         handler = getattr(self, name, None)
         if not handler:
             return self.manual({"reason": f"unknown action '{name}': {action}"})

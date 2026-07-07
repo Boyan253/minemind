@@ -32,8 +32,8 @@ You emit plans as JSON only, using EXACTLY this action vocabulary (the actuator
 implements these and nothing else):
 
 - {"action": "goto", "x": .., "y": .., "z": ..}                      # Baritone pathing
-- {"action": "goto_block", "block": "mod:block_id"}                  # path to nearest matching block
-- {"action": "mine", "block": "mod:block_id", "count": N}            # Baritone #mine
+(goto_block/mine exist for legacy plans but are AUTO-REMAPPED to agent_mine —
+do not plan them; use the companion actions above)
 - {"action": "collect", "item": "mod:item_id", "count": N}           # pick up drops / forage
 - {"action": "craft", "item": "mod:item_id", "count": N}             # inventory or crafting table
 - {"action": "smelt", "item": "mod:input_id", "count": N}            # furnace-type
