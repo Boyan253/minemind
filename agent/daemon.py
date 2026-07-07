@@ -9,6 +9,7 @@ Start this first, then in Minecraft chat run:  \\agent_bridge
 """
 import argparse
 import json
+import shutil
 import socket
 import sys
 import time
@@ -314,6 +315,7 @@ def main():
                 actions.quest_checkmark({"quest_id": quest["id"]})
     fail_counts = {}
     blocked = set()
+    escalate_next = False  # after 2 failures, the strong model gets one shot
     directive = {"text": None, "chat_seen": 0}
     session_start_done = len(get_completed() & set(quest_index))
 
@@ -353,10 +355,16 @@ def main():
                        f"selection toward this): {directive['text']}")
         # planning can transiently fail (LLM rate limit, malformed JSON) — retry,
         # then skip this cycle rather than crashing the whole session
+        planner_chain = None
+        if escalate_next and shutil.which("claude"):
+            planner_chain = ["claude-cli"]
+            log("escalating this plan to the strong model (repeated quest failure)")
+            escalate_next = False
         plan = None
         for attempt in range(3):
             try:
-                plan = planner.extract_json(llm.complete(planner.PLANNER_SYSTEM, prompt))
+                plan = planner.extract_json(
+                    llm.complete(planner.PLANNER_SYSTEM, prompt, chain=planner_chain))
                 break
             except Exception as exc:
                 log(f"planning attempt {attempt + 1} failed: {exc}")
@@ -373,7 +381,9 @@ def main():
         if failed:
             qid = failed.get("for_quest")
             fail_counts[qid] = fail_counts.get(qid, 0) + 1
-            if qid and fail_counts[qid] >= 2:
+            if qid and fail_counts[qid] == 2:
+                escalate_next = True  # strong model gets one shot before we give up
+            if qid and fail_counts[qid] >= 3:
                 blocked.add(qid)
                 log(f"quest {qid} failed {fail_counts[qid]} plans — blocking it this session")
                 bridge.call("echo", text=f"[agent] giving up on quest {qid} for now — "

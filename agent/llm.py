@@ -61,10 +61,11 @@ def _dispatch(p, system, prompt, max_tokens):
     raise RuntimeError(f"unknown LLM provider: {p!r} (known: {KNOWN})")
 
 
-def complete(system, prompt, max_tokens=4000):
+def complete(system, prompt, max_tokens=4000, chain=None):
     """Text response for a system+user pair; falls through the provider chain
-    on any failure (rate limit, network, auth) so free tiers stack."""
-    chain = [x for x in provider().split(",") if x]
+    on any failure (rate limit, network, auth) so free tiers stack.
+    `chain` overrides the configured providers (e.g. quality escalation)."""
+    chain = chain or [x for x in provider().split(",") if x]
     last_error = None
     for p in chain:
         try:
