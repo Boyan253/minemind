@@ -72,6 +72,7 @@ implements these and nothing else):
 - {"action": "place", "item": "mod:block_id", "at": {"x":..,"y":..,"z":..}}     # give coords near the player when possible; "where": "description" falls back to asking the human
 - {"action": "use_item_on", "item": "mod:item_id", "target": "mod:block_id", "at": {"x":..,"y":..,"z":..}}  # "at" optional if already looking at the target
 - {"action": "interact", "block": "mod:block_id", "gui": true|false, "at": {"x":..,"y":..,"z":..}}  # right-click; gui:true verifies a screen opened
+- {"action": "take_from_chest", "item": "mod:item_id", "count": N, "at": {"x":..,"y":..,"z":..}}  # walk the player to a KNOWN container (state.base.containers positions!) and grab items with a quick .done
 - {"action": "wait_for", "condition": "short description"}           # crop growth, machine done, night, ...
 - {"action": "quest_checkmark", "quest_id": "HEX"}                   # checkmark tasks: /ftbquests change progress (equivalent to clicking the book)
 - {"action": "manual", "reason": "why automation can't do this yet"} # escalate to human
@@ -87,17 +88,24 @@ WORLD FACTS — Reclamation overrides vanilla Minecraft; NEVER assume vanilla re
   Fuel is charcoal from dead logs, not coal.
 - Dirt/grass are scarce; the ground is dried earth. Food and plants come from
   quests, crops, and mod mechanics — not from wild vegetation.
+- Enchanted-mod seeds (belladonna, mandrake, wolfsbane, snowbell, water
+  artichoke) drop from breaking the sparse GRASS TUFTS that survived; their
+  FLOWERS/roots come from planting those seeds on farmland and harvesting.
 """
 
 _RULES = """\
 Rules:
 - Respect quest dependencies; only target quests whose dependencies are complete.
-- state.base (when present) describes the player's home base: "notes" list the
-  infrastructure that already exists (garden, Theurgy distillation workshop,
-  Nature's Aura altar, ...) and "storage_totals" are items already in base
-  chests. STRONGLY prefer using existing machines and stored materials over
-  gathering or building from scratch. The player's tools (axes, pickaxes, ...)
-  are shared — plan to use the best available tool rather than crafting new.
+- CHECK STORAGE FIRST: before gathering or asking the human for ANY item, look
+  at state.base.storage_totals and state.base.containers (each container lists
+  its position and contents). If the item is already in a chest: companion mode
+  -> agent_run goto the container position, then agent_take; player mode ->
+  take_from_chest with that container's "at" coordinates. Asking the human to
+  fetch an item that is sitting in a surveyed chest is a planning failure.
+- state.base "notes" list existing infrastructure (garden, Theurgy workshop,
+  Nature's Aura altar...). STRONGLY prefer existing machines and stored
+  materials over gathering/building from scratch. The player's tools are
+  shared — use the best available rather than crafting new.
 - Ocean/large water crossings: prefer land routes; if a crossing is essential,
   plan crafting a boat from stored wood followed by a "manual" step to drive
   it — boat piloting is not automated yet.
@@ -129,9 +137,15 @@ def get_system(body="companion"):
 PLANNER_SYSTEM = get_system("companion")
 
 
-def build_planner_prompt(chapter_summary, frontier_quests, state, max_quests=12):
+def build_planner_prompt(chapter_summary, frontier_quests, state, max_quests=10):
     import json as _json
-    quests_json = _json.dumps(frontier_quests[:max_quests], indent=1, ensure_ascii=False)
+    # trim descriptions to keep the payload inside free-tier token limits
+    slim = []
+    for q in frontier_quests[:max_quests]:
+        q = dict(q)
+        q["description"] = (q.get("description") or [])[:2]
+        slim.append(q)
+    quests_json = _json.dumps(slim, indent=1, ensure_ascii=False)
     state_json = _json.dumps(state, indent=1)
     return f"""Current game state:
 {state_json}

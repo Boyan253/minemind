@@ -106,13 +106,19 @@ def load_base_summary():
         return None
     base = json.loads(BASE_PATH.read_text(encoding="utf-8"))
     totals = {}
+    containers = []
     for c in (base.get("containers") or {}).values():
         for item, count in c.get("items", {}).items():
             totals[item] = totals.get(item, 0) + count
+        pos = c.get("position") or {}
+        top_items = dict(sorted(c.get("items", {}).items(), key=lambda kv: -kv[1])[:10])
+        containers.append({"at": {"x": int(pos.get("x", 0)), "y": int(pos.get("y", 0)),
+                                  "z": int(pos.get("z", 0))},
+                           "kind": c.get("screen", "container"), "items": top_items})
     top = dict(sorted(totals.items(), key=lambda kv: -kv[1])[:80])
     return {"notes": base.get("notes", []),
             "storage_totals": top,
-            "container_count": len(base.get("containers", {}))}
+            "containers": containers}
 
 
 def build_game_state(bridge, world, completed):

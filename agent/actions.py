@@ -441,6 +441,22 @@ class Actions:
         have = self._agent_inv(item)
         return have < before or before == 0, f"agent {item}: {before} -> {have}"
 
+    def take_from_chest(self, step):
+        """Walk the player to a known container and have the human grab items
+        (player-body chest automation needs GUI clicks we don't have yet)."""
+        item, count = self._bare(step["item"]), int(step.get("count", 1))
+        at = step.get("at") or {}
+        before = self._inventory().get(item, 0)
+        if isinstance(at, dict) and "x" in at:
+            self.bridge.call("chat", text=f"#goto {int(at['x'])} {int(at['y'])} {int(at['z'])}")
+            self._baritone_idle(timeout=step.get("timeout", 180))
+        self.bridge.call("echo", text=f"[agent] open this chest and take {count}x {item}, "
+                                      f"then type .done")
+        if not self._wait_for_player_signal():
+            return False, f"player never confirmed taking {item}"
+        have = self._inventory().get(item, 0)
+        return have >= min(before + count, count), f"player {item}: {before} -> {have}"
+
     def wait_for(self, step):
         seconds = step.get("seconds", 30)
         self.log(f"wait_for: {step.get('condition', '')} — sleeping {seconds}s")
