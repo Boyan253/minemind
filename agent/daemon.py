@@ -308,6 +308,7 @@ def main():
     import prompts
     graph = state_mod.load_graph(ROOT / "data" / "quest_graph.json")
     quest_index = state_mod.quest_index(graph)
+    actions.quest_titles = {qid: q["title"] for qid, q in quest_index.items()}
 
     def reconcile_item_quests():
         """FTB item-task auto-detection only fires on inventory CHANGE — items

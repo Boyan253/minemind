@@ -25,6 +25,11 @@ class Actions:
         self.mp = mp                  # multiplayer: no save files, maybe no OP
         self.body = body              # "companion" (PlayerEngine entity) | "player" (own body)
         self.mark_complete = mark_complete or (lambda qid: None)
+        self.quest_titles = {}        # id -> human title (daemon fills from the graph)
+
+    def _qname(self, qid):
+        title = self.quest_titles.get(qid)
+        return f"'{title}'" if title else qid
 
     # -- helpers ------------------------------------------------------------
 
@@ -106,9 +111,9 @@ class Actions:
         if any(w in chat.lower() for w in CMD_ERRORS):
             if self.mp:
                 self.bridge.call("echo", text=f"[agent] no OP for /ftbquests — click quest "
-                                              f"{qid} in the book, then type .done in chat")
+                                              f"{self._qname(qid)} in the book, then type .done")
                 if not self._wait_for_player_signal():
-                    return False, f"no OP and player never confirmed quest {qid}"
+                    return False, f"no OP and player never confirmed quest {self._qname(qid)}"
                 self.mark_complete(qid)
                 return True, "completed manually (no OP on server)"
             return False, f"/ftbquests rejected: {chat[:150]}"
