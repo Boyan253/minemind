@@ -34,6 +34,11 @@ implements these and nothing else):
 - {"action": "goto", "x": .., "y": .., "z": ..}                      # Baritone pathing
 (goto_block/mine exist for legacy plans but are AUTO-REMAPPED to agent_mine —
 do not plan them; use the companion actions above)
+- agent_mine SEARCHES for the block itself: it explores the world until it
+  finds one (surface ruins included). NEVER escalate "location unknown" to
+  "manual" — plan agent_mine with a generous "timeout" (e.g. 900 for rare
+  blocks like minecraft:oxidized_cut_copper); if it truly can't find any,
+  the step fails and you replan with better information.
 - {"action": "collect", "item": "mod:item_id", "count": N}           # pick up drops / forage
 - {"action": "craft", "item": "mod:item_id", "count": N}             # inventory or crafting table
 - {"action": "smelt", "item": "mod:input_id", "count": N}            # furnace-type
