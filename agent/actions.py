@@ -17,11 +17,13 @@ CMD_ERRORS = ("permission", "unknown command", "no such", "incorrect argument",
 
 
 class Actions:
-    def __init__(self, bridge, get_completed_quests, log, mp=False, mark_complete=None):
+    def __init__(self, bridge, get_completed_quests, log, mp=False, mark_complete=None,
+                 body="companion"):
         self.bridge = bridge          # BridgeClient (daemon.py)
         self.get_completed = get_completed_quests
         self.log = log
         self.mp = mp                  # multiplayer: no save files, maybe no OP
+        self.body = body              # "companion" (PlayerEngine entity) | "player" (own body)
         self.mark_complete = mark_complete or (lambda qid: None)
 
     # -- helpers ------------------------------------------------------------
@@ -416,18 +418,49 @@ class Actions:
             return False, "player never confirmed manual step"
         return True, "human handled it"
 
-    # resource work belongs to the companion — models (esp. free ones) keep
-    # planning player-body actions despite prompt rules, so route structurally
-    PLAYER_BODY_REMAP = {"mine": "agent_mine", "goto_block": "agent_mine"}
+    # models drift across body modes despite prompt rules — route structurally.
+    # companion mode: resource work goes to the PlayerEngine entity;
+    # player mode: agent_* actions fold back onto the player's own body.
+    COMPANION_REMAP = {"mine": "agent_mine", "goto_block": "agent_mine"}
+    PLAYER_REMAP = {"agent_mine": "mine", "agent_craft": "craft",
+                    "agent_get": "craft", "agent_take": "manual", "agent_store": "manual"}
+
+    def _remap_for_body(self, name, action):
+        if self.body == "companion":
+            if name in self.COMPANION_REMAP and action.get("block"):
+                action.setdefault("count", 2 if name == "goto_block" else 8)
+                return self.COMPANION_REMAP[name]
+            return name
+        # player mode
+        if name == "agent_give":
+            return "_noop_already_player"  # items are already in the player's inventory
+        if name == "agent_run":
+            cmd = str(action.get("cmd", "")).split()
+            if cmd and cmd[0] == "goto" and len(cmd) >= 4:
+                action.update(x=float(cmd[1]), y=float(cmd[2]), z=float(cmd[3]))
+                return "goto"
+            if cmd and cmd[0] == "attack":
+                action["entity"] = cmd[1] if len(cmd) > 1 else ""
+                return "kill"
+            if cmd and cmd[0] == "stop":
+                self.bridge.call("chat", text="#stop")
+            return "_noop_already_player"  # follow/pickup_drops/etc are meaningless solo
+        if name in self.PLAYER_REMAP:
+            if self.PLAYER_REMAP[name] == "manual":
+                action["reason"] = f"{name} has no player-body equivalent: {action}"
+            return self.PLAYER_REMAP[name]
+        return name
+
+    def _noop_already_player(self, step):
+        return True, "no-op in player-body mode"
 
     def run(self, step):
         action = dict(step["action"])
         name = action.pop("action")
-        if name in self.PLAYER_BODY_REMAP and action.get("block"):
-            remapped = self.PLAYER_BODY_REMAP[name]
-            action.setdefault("count", 2 if name == "goto_block" else 8)
-            self.log(f"  (remapped {name} -> {remapped}: the companion handles resource work)")
-            name = remapped
+        new_name = self._remap_for_body(name, action)
+        if new_name != name:
+            self.log(f"  (remapped {name} -> {new_name} for body={self.body})")
+            name = new_name
         handler = getattr(self, name, None)
         if not handler:
             return self.manual({"reason": f"unknown action '{name}': {action}"})

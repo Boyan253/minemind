@@ -9,6 +9,7 @@ Start this first, then in Minecraft chat run:  \\agent_bridge
 """
 import argparse
 import json
+import os
 import shutil
 import socket
 import sys
@@ -227,6 +228,11 @@ def main():
                     help="learn the base: record every container the player opens")
     ap.add_argument("--base", default=None, help="base knowledge file (default: "
                     "data/base_mp.json with --mp, data/base_sp.json otherwise)")
+    ap.add_argument("--body", default=os.environ.get("RECLAMATION_BODY", "companion"),
+                    choices=["companion", "player"],
+                    help="companion = PlayerEngine entity does the work (needs server-side "
+                         "mods); player = the AI drives YOUR character (client-side only, "
+                         "works on any server)")
     ap.add_argument("--max-cycles", type=int, default=10)
     args = ap.parse_args()
 
@@ -269,17 +275,20 @@ def main():
     completed = get_completed()
     log(f"{len(completed)} quests already complete")
 
-    actions = Actions(bridge, get_completed, log, mp=args.mp, mark_complete=mark_complete)
-    bridge.call("echo", text="[agent] online — starting work")
+    actions = Actions(bridge, get_completed, log, mp=args.mp, mark_complete=mark_complete,
+                      body=args.body)
+    log(f"body mode: {args.body}")
+    bridge.call("echo", text=f"[agent] online ({args.body} mode) — starting work")
 
-    # make sure a PlayerEngine companion exists in THIS world
-    if actions.agent_state(timeout=6) is None:
-        log("no companion in this world — spawning Bob")
-        bridge.call("chat", text="/agent spawn Bob")
-        time.sleep(3)
-    # silence PlayerEngine's Player2 cloud bridge (no account -> HTTP 500 spam);
-    # our planner drives the controller directly, so nothing is lost
-    bridge.call("chat", text="/agent run chatclef off")
+    if args.body == "companion":
+        # make sure a PlayerEngine companion exists in THIS world
+        if actions.agent_state(timeout=6) is None:
+            log("no companion in this world — spawning Bob")
+            bridge.call("chat", text="/agent spawn Bob")
+            time.sleep(3)
+        # silence PlayerEngine's Player2 cloud bridge (no account -> HTTP 500 spam);
+        # our planner drives the controller directly, so nothing is lost
+        bridge.call("chat", text="/agent run chatclef off")
 
     if args.plan:
         plan = json.loads(Path(args.plan).read_text(encoding="utf-8"))
@@ -290,6 +299,7 @@ def main():
     # LLM planning loop
     import llm
     import planner
+    import prompts
     graph = state_mod.load_graph(ROOT / "data" / "quest_graph.json")
     quest_index = state_mod.quest_index(graph)
 
@@ -367,7 +377,7 @@ def main():
         for attempt in range(3):
             try:
                 plan = planner.extract_json(
-                    llm.complete(planner.PLANNER_SYSTEM, prompt, chain=planner_chain))
+                    llm.complete(prompts.get_system(args.body), prompt, chain=planner_chain))
                 break
             except Exception as exc:
                 log(f"planning attempt {attempt + 1} failed: {exc}")
