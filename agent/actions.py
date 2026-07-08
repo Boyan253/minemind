@@ -320,21 +320,49 @@ class Actions:
         return state["inventory"].get(self._bare(item), 0)
 
     def agent_mine(self, step):
-        """Companion mines ANY registered block (modded ids included)."""
+        """Companion mines ANY registered block (modded ids included). If the
+        block is nowhere nearby, MineAndCollect just idles — so when the agent
+        stands still without progress, we walk it along an expanding spiral
+        and re-issue the mine task at each stop (real exploration)."""
+        import math
         block, count = step["block"], int(step.get("count", 8))
         want = self._bare(step.get("collect_item", block))
-        before = self._agent_inv(want)
-        self.bridge.call("chat", text=f"/agent mine {block} {count}")
+        state0 = self.agent_state() or {}
+        before = (state0.get("inventory") or {}).get(want, 0)
         target = before + count
-
-        def enough():
-            return self._agent_inv(want) >= target
-        ok = self._wait(enough, timeout=step.get("timeout", 600), poll=15,
-                        desc=f"agent mining {block}")
-        if not ok:
-            self.bridge.call("chat", text="/agent stop")
+        deadline = time.time() + step.get("timeout", 600)
+        self.bridge.call("chat", text=f"/agent mine {block} {count}")
+        home = state0.get("pos")
+        last_pos, still_since = home, time.time()
+        ring, leg = 90, 0
+        while time.time() < deadline:
+            time.sleep(12)
+            st = self.agent_state() or {}
+            have = (st.get("inventory") or {}).get(want, 0)
+            if have >= target:
+                return True, f"agent {want}: {before} -> {have}"
+            pos = st.get("pos")
+            if pos:
+                home = home or pos
+                if last_pos and max(abs(pos[0] - last_pos[0]), abs(pos[2] - last_pos[2])) > 3:
+                    still_since = time.time()  # it's moving — let it work
+                last_pos = pos
+                if time.time() - still_since > 45:
+                    ang = math.radians(leg * 47)
+                    wx = int(home[0] + ring * math.cos(ang))
+                    wz = int(home[2] + ring * math.sin(ang))
+                    self.log(f"  agent idle — exploring toward {wx},{wz} (ring {ring})")
+                    self.bridge.call("echo", text=f"[agent] no {want} here — scouting {wx},{wz}")
+                    self.bridge.call("chat", text=f"/agent run goto {wx} {int(pos[1])} {wz}")
+                    leg += 1
+                    if leg % 8 == 0:
+                        ring += 70
+                    time.sleep(40)  # travel window
+                    self.bridge.call("chat", text=f"/agent mine {block} {count}")
+                    still_since = time.time()
+        self.bridge.call("chat", text="/agent stop")
         have = self._agent_inv(want)
-        return have > before, f"agent {want}: {before} -> {have} (wanted {target})"
+        return have > before, f"agent {want}: {before} -> {have} (explored, wanted {target})"
 
     def agent_get(self, step):
         """Companion runs a full AltoClef gather/craft chain — VANILLA items only."""
