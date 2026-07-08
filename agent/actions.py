@@ -148,6 +148,9 @@ class Actions:
         return have > before, f"{want_item}: {before} -> {have} (wanted {target})"
 
     def collect(self, step):
+        """Wait for an item to appear in the player's inventory (rewards, drops).
+        Models also plan it for raw resources — so in companion mode, after a
+        short grace period, fall back to mine-and-deliver via the companion."""
         item, count = self._bare(step["item"]), int(step.get("count", 1))
 
         def enough():
@@ -156,8 +159,18 @@ class Actions:
             return True, "already in inventory"
         self.bridge.call("echo", text=f"[agent] waiting for {count}x {item} in YOUR inventory — "
                                       f"if it's a quest reward, claim it in the book")
-        ok = self._wait(enough, timeout=step.get("timeout", 180), poll=3, desc=f"collect {item}")
-        return ok, f"{item} x{self._inventory().get(item, 0)}"
+        grace = 45 if self.body == "companion" else step.get("timeout", 180)
+        if self._wait(enough, timeout=grace, poll=3, desc=f"collect {item}"):
+            return True, f"{item} x{self._inventory().get(item, 0)}"
+        if self.body != "companion":
+            return False, f"{item} x{self._inventory().get(item, 0)}"
+        self.log(f"  collect fallback: sending the companion to mine {item}")
+        self.bridge.call("echo", text=f"[agent] not appearing — Bob will go get {item} instead")
+        ok, note = self.agent_mine({"block": step["item"], "count": count,
+                                    "timeout": step.get("timeout", 600)})
+        if not ok:
+            return False, f"collect fallback failed: {note}"
+        return self.agent_give({"item": item, "count": count})
 
     # -- M3: hands ------------------------------------------------------------
 
