@@ -9,6 +9,7 @@ Defensive about the Minescript API surface: anything missing is reported by
 "probe" and returns null in "state" instead of crashing the bridge.
 """
 import json
+import os
 import socket
 import threading
 import time
@@ -240,6 +241,10 @@ def chat_listener():
                 msg = getattr(event, "message", None) or str(event)
                 CHAT_SEQ["n"] += 1
                 CHAT_LOG.append({"n": CHAT_SEQ["n"], "t": time.time(), "message": msg})
+                # one-word kill switch: player types .quit in chat
+                if ".quit" in msg.lower() and "[agent" not in msg and "[bridge" not in msg:
+                    minescript.echo("[bridge] .quit received — shutting down")
+                    os._exit(0)
     except Exception as exc:
         minescript.echo(f"[bridge] chat listener stopped: {exc}")
 

@@ -21,7 +21,7 @@ COMPANION actions (STRONGLY PREFERRED for resource work):
 - {"action": "agent_take", "item": "copper_ingot", "count": 8}        # pull from chests/machine slots within 12 blocks of the agent
 - {"action": "agent_store", "item": "cobblestone", "count": 64}       # store into the nearest chest
 - {"action": "agent_give", "item": "dead_log", "count": 16}           # transfer agent -> player. CRITICAL: quest item tasks check the PLAYER's inventory, so always agent_give after gathering/crafting!
-- {"action": "agent_run", "cmd": "follow"}                            # raw commands: follow | goto <x> <y> <z> | attack <mob> | deposit | equip <item> | stop
+- {"action": "agent_run", "cmd": "follow"}                            # raw commands: follow | goto <x> <y> <z> | attack <mob> | pickup_drops | deposit | equip <item> | stop
 Typical quest flow: agent_mine ingredients -> agent_craft item -> agent_give to player.
 NEVER use the player-body actions goto/goto_block/mine for resource work — the
 companion versions (agent_mine, agent_run goto) do the same job while the
@@ -63,9 +63,11 @@ Rules:
   chests. STRONGLY prefer using existing machines and stored materials over
   gathering or building from scratch. The player's tools (axes, pickaxes, ...)
   are shared — plan to use the best available tool rather than crafting new.
-- Mob-drop items (string, bones, rotten flesh...): the companion can KILL mobs
-  but does NOT auto-collect their drops yet. Avoid planning quests that need
-  mob drops unless the player directive asks for them; use "manual" instead.
+- Mob-drop items (string, bones, rotten flesh...): kill then gather —
+  {"action":"agent_run","cmd":"attack <mob>"} then
+  {"action":"agent_run","cmd":"pickup_drops"} (collects ALL nearby drops into
+  the agent), then agent_give the item to the player. Plan attack near where
+  the mobs actually spawn (night surface / caves).
 - Ocean/large water crossings: prefer land routes; if a crossing is essential,
   plan {"action":"craft","item":"minecraft:oak_boat",...} (or any wood variant
   in storage) followed by a "manual" step to drive it — boat piloting is not
